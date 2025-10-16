@@ -1,5 +1,3 @@
-# api/services.py
-
 import os
 import time
 import warnings
@@ -46,7 +44,7 @@ class CreditScoreClassifier:
         서비스를 초기화하고 필요한 모델과 인코더를 로드합니다.
         """
         self.session_maker = None
-        self.bento_model = bentoml.models.get("credit_score_classifier:latest")
+        self.bento_model = bentoml.models.get("credit_score_classification:latest")
         self.robust_scalers = joblib.load(
             os.path.join(encoder_path, "robust_scaler.joblib")
         )
@@ -72,9 +70,11 @@ class CreditScoreClassifier:
         df = pd.DataFrame([data.model_dump()])
         customer_id = df.pop("customer_id").item()
 
+        # RobustScaler 적용
         for col, scaler in self.robust_scalers.items():
             df[col] = scaler.transform(df[[col]])
 
+        # 모델 추론 결과로 확률값과 예측 레이블을 저장
         prob = np.max(self.model.predict(df, prediction_type="Probability"))
         label = self.model.predict(df, prediction_type="Class").item()
         elapsed_ms = (time.time() - start_time) * 1000
@@ -86,6 +86,7 @@ class CreditScoreClassifier:
             confidence=prob,
             elapsed_ms=elapsed_ms,
         )
+
         with self.session_maker() as db:
             with db.begin():
                 db.add(record)
@@ -101,4 +102,3 @@ class CreditScoreClassifier:
             params=self.bento_model.info.metadata,
             creation_time=self.bento_model.info.creation_time,
         )
-
