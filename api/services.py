@@ -1,3 +1,5 @@
+# api/services.py
+
 import os
 import time
 import warnings
@@ -44,7 +46,7 @@ class CreditScoreClassifier:
         서비스를 초기화하고 필요한 모델과 인코더를 로드합니다.
         """
         self.session_maker = None
-        self.bento_model = bentoml.models.get("credit_score_classification:latest")
+        self.bento_model = bentoml.models.get("credit_score_classifier:latest")
         self.robust_scalers = joblib.load(
             os.path.join(encoder_path, "robust_scaler.joblib")
         )
@@ -70,19 +72,23 @@ class CreditScoreClassifier:
         df = pd.DataFrame([data.model_dump()])
         customer_id = df.pop("customer_id").item()
 
-        # TODO: RobustScaler 적용
+        for col, scaler in self.robust_scalers.items():
+            df[col] = scaler.transform(df[[col]])
 
-        # TODO: 모델 추론 결과로 확률값과 예측 레이블을 저장
-        prob = None
-        label = None
-
+        prob = np.max(self.model.predict(df, prediction_type="Probability"))
+        label = self.model.predict(df, prediction_type="Class").item()
         elapsed_ms = (time.time() - start_time) * 1000
 
         record = CreditPredictionApiLog(
-            # TODO: 기본값이 존재하지 않는 컬럼에 적절한 값 매핑
+            customer_id=customer_id,
+            features=data.model_dump(),
+            prediction=label,
+            confidence=prob,
+            elapsed_ms=elapsed_ms,
         )
-
-        # TODO: 로깅할 값을 테이블에 적재 후 커밋
+        with self.session_maker() as db:
+            with db.begin():
+                db.add(record)
 
         return Response(customer_id=customer_id, predict=label, confidence=prob)
 
@@ -95,3 +101,4 @@ class CreditScoreClassifier:
             params=self.bento_model.info.metadata,
             creation_time=self.bento_model.info.creation_time,
         )
+

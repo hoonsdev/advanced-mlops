@@ -44,7 +44,7 @@ def get_random_features():
         "payment_of_min_amount": random.choice(["Yes", "No", "NM"]),
         "total_emi_per_month": float(random.uniform(0, 1000)),
         "amount_invested_monthly": float(random.uniform(0, 1000)),
-        "payment_behaviour": "Low_spent_Small_value_payments",
+        "payment_locust -fhaviour": "Low_spent_Small_value_payments",
         "monthly_balance": float(random.uniform(0, 1200)),
     }
 
